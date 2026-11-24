@@ -1,0 +1,215 @@
+# Haru-4B Local Infinite AI Radio Configuration
+
+model:
+  # Default: haru-4b:q8_0 (~6.62 GB). Switch to "haru-4b:q6_K" (~5.61 GB) if VRAM is tight.
+  name: "haru-4b:q8_0"
+  # "auto" (first GPU or CPU), "gpu", "cpu", or specific device name from `speech devices` (e.g. "Vulkan0")
+  device: "auto"
+  # 0 = speech.cpp default (performance/physical cores)
+  threads: 0
+  warmup: true
+  # Leave empty to auto-detect from %LOCALAPPDATA%\Programs\speech.cpp\current\speech.dll or PATH
+  speech_dll: ""
+
+dialogue:
+  # Natural topic-ending bounds (~3.5-4.0 minutes, before speech density drops off at 240s+)
+  min_segment_sec: 150
+  target_segment_sec: 225
+  max_segment_sec: 270
+  # Silence duration (both hosts quiet) after a sentence ending to finish the topic cleanly
+  end_silence_sec: 1.5
+  # Audio opening cue injected as Host B at t=0 so Host A directly answers the actual topic
+  opening_cue:
+    enabled: true
+    templates:
+      - "今回のお題は、{topic}です！ハルさん、どう思いますか？"
+      - "続いてのテーマは、{topic}です！ハルさん、どうですか？"
+      - "今回のトークテーマは、{topic}です！ハルさんはどうですか？"
+  # Audio wrap-up cue injected as Host B so Host A naturally closes the corner
+  wrapup_cue:
+    enabled: true
+    # Earliest time (sec) to wait for a sentence-ending pause and inject Mina's wrap-up cue (~3.5-4 min total)
+    trigger_sec: 215
+    # Maximum extra wait (sec) for a sentence pause before injecting at the next brief gap
+    max_wait_sec: 25
+    # Stop cleanly if Host A stays silent this many seconds after the cue
+    post_cue_silence_sec: 2.0
+    # Maximum seconds to continue after the cue finishes (prevents repetition)
+    post_cue_max_sec: 6.0
+    cache_dir: "assets/cues"
+    phrases:
+      - "ハルさん、そろそろお時間ですね。次の話題にいきましょうか！"
+      - "あっという間にお時間ですね。ハルさん、次のテーマにいきましょうか！"
+      - "そろそろ次のコーナーのお時間ですね。ハルさん、次のお題にいきましょうか！"
+  # Legacy fallback duration if max_segment_sec is omitted
+  segment_duration_sec: 225
+  # Extra margin added to max_seconds so the session never hits out_of_range early
+  max_seconds_margin: 15
+  # Slightly higher temperature (0.65) helps prevent silence-token deadlock between two AI hosts
+  temperature: 0.65
+  top_k: 25
+  top_p: 1.0
+  guidance_scale: 1.5
+  eop_bias: 0.0
+  # Retries if quality check detects silence, repetition collapse, or prompt leakage
+  max_retries: 2
+  quality_check:
+    min_speech_ratio: 0.12
+    min_chars_per_30s: 15
+    max_repeat_ngram_ratio: 0.45
+    # Reject single-speaker monologues (quieter host must have at least this share of spoken chars)
+    min_minor_speaker_ratio: 0.15
+    # Reject segments where one speaker talks continuously for longer than this without the other responding
+    max_monologue_sec: 75.0
+    # Reject segments containing any continuous dead-air silence longer than this (seconds)
+    max_silence_sec: 12.0
+
+voices:
+  # Used only on first run if assets/voices/host_a.wav & host_b.wav do not exist yet
+  fallback_tts_model: "qwen3-tts-0.6b"
+  fallback_samples:
+    host_a:
+      tts_voice: "dylan"
+      text: "なるほど、そういう見方もあるんですね。たしかに身近なところから考えてみると、意外と気づかない工夫や面白さってたくさんありますよね。もう少し詳しく聞いてみたいです。"
+    host_b:
+      tts_voice: "ono_anna"
+      text: "そうなんです、実際に試してみるとすごく印象が変わるんですよね。ちょっとしたきっかけで新しい発見があると、なんだか嬉しくなって誰かに話したくなりますよね。"
+
+hosts:
+  host_a:
+    voice_name: "host_a"
+    wav_path: "assets/voices/host_a.wav"
+    voice_gguf_path: "assets/voices/host_a.voice.gguf"
+    language: "ja"
+    name: "ハル"
+    persona: "落ち着いた声で好奇心旺盛なラジオパーソナリティ。話題を広げるのが得意で、自然な相槌やちょっとしたユーモアを交えて話す。"
+    gender: "male"
+    backchannel: "mid"
+    other_name: "ミナ"
+    relationship: "長年一緒にラジオ番組を続けている仲の良い相棒"
+    situation_template: "ラジオ番組の本編トーク中（オープニング挨拶はすでに終了済み）。今回のお題「{topic}」（{detail}）について、挨拶や番組紹介をやり直さず、そのまま具体的なエピソードや感想を掘り下げて楽しく雑談している。"
+    # Higher eop_bias makes Haru initiate speaking and break pauses first
+    eop_bias: 0.6
+    pan: -0.25
+  host_b:
+    voice_name: "host_b"
+    wav_path: "assets/voices/host_b.wav"
+    voice_gguf_path: "assets/voices/host_b.voice.gguf"
+    language: "ja"
+    name: "ミナ"
+    persona: "明るくテンポの良いラジオの相棒パーソナリティ。素朴な疑問や身近なエピソードを交えて会話を弾ませ、聞き上手。"
+    gender: "female"
+    backchannel: "high"
+    other_name: "ハル"
+    relationship: "長年一緒にラジオ番組を続けている仲の良い相棒"
+    situation_template: "ラジオ番組の本編トーク中（オープニング挨拶はすでに終了済み）。今回のお題「{topic}」（{detail}）について、挨拶や番組紹介をやり直さず、そのまま具体的なエピソードや感想を掘り下げて楽しく雑談している。"
+    eop_bias: 0.1
+    pan: 0.25
+
+audio:
+  output_sample_rate: 44100
+  output_channels: 2
+  mp3_bitrate: "128k"
+  bgm_dir: "assets/bgm"
+  bgm_duck_db: -18.0
+  # Two-tone corner start chime (false = disabled to avoid notification-like beep)
+  enable_jingle: false
+  # Voice station ID bumper played between topics (Haru & Mina together)
+  station_id:
+    enabled: true
+    text: "ハルとミナの、無限ラジオ"
+    cache_dir: "assets/cues"
+  # Gentle pause (seconds) added after each corner before the next topic starts
+  inter_segment_pause_sec: 1.5
+  # Automatically compact any dead-air silence inside a talk longer than this (seconds)
+  max_silence_gap_sec: 2.0
+  jingle_fade_sec: 1.5
+  loudnorm_target_i: -16.0
+  loudnorm_target_tp: -1.5
+  loudnorm_target_lra: 11.0
+
+queue:
+  dir: "queue"
+  min_segments: 2
+  max_segments: 5
+  poll_interval_sec: 2.0
+
+topics:
+  file: "topics.yaml"
+  db_path: "state.db"
+  rss_refresh_minutes: 45
+  rss_timeout_sec: 8
+  rss_max_per_feed: 30
+  # Share of RSS news vs evergreen/dynamic radio topics when both are available (0.0-1.0)
+  rss_ratio: 0.75
+  # Dynamically combine themes x angles x time-of-day when YAML/RSS pool is exhausted
+  dynamic_topics_enabled: true
+  rss_feeds:
+    - "https://www.nhk.or.jp/rss/news/cat0.xml"
+    - "https://www.nhk.or.jp/rss/news/cat3.xml"
+    - "https://www.nhk.or.jp/rss/news/cat7.xml"
+    - "https://gigazine.net/news/rss_2.0/"
+    - "https://rss.itmedia.co.jp/rss/2.0/news_bursts.xml"
+    - "https://kaden.watch.impress.co.jp/data/rss/1.0/kdw/feed.rdf"
+    - "https://gourmet.watch.impress.co.jp/data/rss/1.0/grw/feed.rdf"
+    - "https://pc.watch.impress.co.jp/data/rss/1.0/pcw/feed.rdf"
+    - "https://game.watch.impress.co.jp/data/rss/1.0/gmw/feed.rdf"
+    - "https://b.hatena.ne.jp/hotentry/it.rss"
+    - "https://b.hatena.ne.jp/hotentry/life.rss"
+    - "https://b.hatena.ne.jp/hotentry/fun.rss"
+    - "https://b.hatena.ne.jp/hotentry/knowledge.rss"
+    - "https://zenn.dev/feed"
+    - "https://www.lifehacker.jp/feed/index.xml"
+
+logs:
+  dir: "logs"
+  keep_transcripts: 20
+
+server:
+  host: "0.0.0.0"
+  port: 8000
+  station_name: "ハルとミナの、無限ラジオ"
+  station_genre: "AI Talk / Japanese"
+  ring_buffer_bytes: 65536
+  # Pause playback (and avoid consuming queue / waking GPU) when listener count is 0
+  pause_when_no_listeners: true
+  # Seconds to wait after last listener disconnects before pausing
+  idle_pause_grace_sec: 15
+
+youtube:
+  # Set true (or run with --youtube) to stream directly to YouTube Live Studio via RTMP
+  enabled: false
+  rtmp_url: "rtmp://a.rtmp.youtube.com/live2"
+  # Prefer setting YOUTUBE_STREAM_KEY environment variable instead of storing keys in config.yaml
+  stream_key: ""
+  width: 1280
+  height: 720
+  # Frame render rate (2-5 fps keeps CPU usage minimal; FFmpeg outputs 30fps for YouTube Live)
+  render_fps: 5
+  output_fps: 30
+  # libx264 (CPU, sharp text with stillimage tune) or h264_nvenc (GPU)
+  video_encoder: "libx264"
+  preset: "veryfast"
+  video_bitrate: "1000k"
+  video_maxrate: "1200k"
+  video_bufsize: "2400k"
+  audio_bitrate: "128k"
+  reconnect_delay_sec: 5
+  # Optional custom background image path (e.g. "assets/bg.png") and Japanese TTF/TTC font path
+  background_image: ""
+  font_path: ""
+  # Permanent AI disclosure labels rendered onto the broadcast screen
+  ai_disclosure_badge: "ローカルAIによる自動生成ラジオ (Haru-4B)"
+  ai_disclosure_footer: "※ この配信はローカルAI音声会話モデル (Haru-4B) による自動生成ラジオです。実在の人物・団体とは関係ありません。"
+
+moderation:
+  # Automatically filter sensitive topics (politics/medical/financial/crime) & check transcripts before broadcast
+  enabled: true
+  filter_topics: true
+  # Additional keywords to block from RSS/YAML topics (appended to built-in safety list)
+  blocked_topic_keywords: []
+  # Additional NG words to reject during pre-broadcast transcript inspection (appended to built-in list)
+  ng_words: []
+  # Optional regex patterns to reject in transcripts
+  ng_regex: []
+

@@ -1,0 +1,29 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Secrets
+.env
+
+# Runtime data (contains topic history, transcripts, generated audio of third-party news)
+state.db
+state.db-*
+logs/
+out/
+queue/
+
+# Locally generated voices / cues (auto-regenerated on first run)
+assets/voices/*
+!assets/voices/.gitkeep
+assets/cues/*
+!assets/cues/.gitkeep
+assets/bgm/*
+!assets/bgm/.gitkeep
+
+# OS / editor
+Thumbs.db
+.DS_Store
+.vscode/
+.idea/
